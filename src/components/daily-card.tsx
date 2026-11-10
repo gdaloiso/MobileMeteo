@@ -1,8 +1,9 @@
 import * as Haptics from "expo-haptics";
 import { SymbolView } from "expo-symbols";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Card } from "@/components/card";
+import { HourlyStrip } from "@/components/hourly-strip";
 import { WeatherIcon } from "@/components/weather-icon";
 import { weekday } from "@/lib/format";
 import { useUnits } from "@/lib/units";
@@ -65,24 +66,7 @@ export function DailyCard({ daily, hourlyAll }: { daily: Weather["daily"]; hourl
                     Dettaglio orario non disponibile. Trascina verso il basso per aggiornare.
                   </Text>
                 ) : (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ paddingVertical: 4 }}
-                  >
-                    {hours.map((h) => (
-                      <View key={h.time.toISOString()} style={{ alignItems: "center", width: 56, gap: 6 }}>
-                        <Text style={{ color: colors.secondaryLabel, fontSize: 12 }}>{units.time(h.time)}</Text>
-                        <WeatherIcon code={h.code} isDay={h.isDay} size={26} />
-                        <Text style={{ color: colors.label, fontSize: 16, fontWeight: "600", fontVariant: ["tabular-nums"] }}>
-                          {units.temp(h.temperature)}
-                        </Text>
-                        <Text style={{ color: colors.tint, fontSize: 11, height: 14 }}>
-                          {units.rain(h.precipProb, h.precipMm) || " "}
-                        </Text>
-                      </View>
-                    ))}
-                  </ScrollView>
+                  <HourlyStrip hours={hours} />
                 )}
               </View>
             ) : null}

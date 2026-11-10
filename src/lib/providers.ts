@@ -1,4 +1,4 @@
-import { HttpError, Place, Weather, getJson } from "./weather";
+import { AirQuality, HttpError, Place, Weather, getJson, summarizeRain } from "./weather";
 
 export type ProviderId = "open-meteo" | "met-no";
 
@@ -15,6 +15,8 @@ export type Settings = {
   startMode: StartMode;
   // Città usata all'avvio quando startMode è "fixed"
   fixedPlace: Place | null;
+  // Sezione "Dettagli" della schermata Oggi aperta o nascosta
+  detailsOpen: boolean;
 };
 
 export type ThemeMode = "auto" | "light" | "dark";
@@ -35,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   timeFormat: "24",
   startMode: "last",
   fixedPlace: null,
+  detailsOpen: true,
 };
 
 export const PROVIDERS: {
@@ -72,8 +75,45 @@ export function isValidContact(s: string): boolean {
 }
 
 export async function fetchWeather(settings: Settings, lat: number, lon: number): Promise<Weather> {
-  if (settings.provider === "met-no") return fetchMetNo(lat, lon, settings.metContact);
-  return fetchOpenMeteo(lat, lon);
+  // La qualità dell'aria arriva da Open-Meteo con entrambe le fonti; se manca, il resto funziona.
+  const [weather, airQuality] = await Promise.all([
+    settings.provider === "met-no" ? fetchMetNo(lat, lon, settings.metContact) : fetchOpenMeteo(lat, lon),
+    fetchAirQuality(lat, lon),
+  ]);
+  return airQuality ? { ...weather, airQuality } : weather;
+}
+
+async function fetchAirQuality(lat: number, lon: number): Promise<AirQuality | undefined> {
+  const params = new URLSearchParams({
+    latitude: String(lat),
+    longitude: String(lon),
+    current: "european_aqi,pm2_5",
+    // Il valore "attuale" a volte manca: in quel caso uso l'ultima ora disponibile
+    hourly: "european_aqi,pm2_5",
+    past_hours: "3",
+    forecast_hours: "1",
+    timezone: "auto",
+  });
+  const url = `https://air-quality-api.open-meteo.com/v1/air-quality?${params.toString()}`;
+  const lastNumber = (arr: unknown): number | undefined => {
+    if (!Array.isArray(arr)) return undefined;
+    for (let i = arr.length - 1; i >= 0; i--) if (typeof arr[i] === "number") return arr[i] as number;
+    return undefined;
+  };
+
+  // Un secondo tentativo copre i brevi errori di rete
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const d = await getJson<any>(url);
+      const aqi = typeof d?.current?.european_aqi === "number" ? d.current.european_aqi : lastNumber(d?.hourly?.european_aqi);
+      if (aqi == null) return undefined;
+      const pm25 = typeof d?.current?.pm2_5 === "number" ? d.current.pm2_5 : lastNumber(d?.hourly?.pm2_5);
+      return { aqi, pm25 };
+    } catch {
+      // riprovo
+    }
+  }
+  return undefined;
 }
 
 /* ------------------------------ Open-Meteo ------------------------------ */
@@ -82,9 +122,9 @@ async function fetchOpenMeteo(lat: number, lon: number): Promise<Weather> {
   const params = new URLSearchParams({
     latitude: String(lat),
     longitude: String(lon),
-    current: "temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day",
+    current: "temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day,uv_index,wind_direction_10m",
     hourly: "temperature_2m,precipitation_probability,weather_code,is_day",
-    daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset",
+    daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max",
     timezone: "auto",
     forecast_days: "7",
     wind_speed_unit: "kmh",
@@ -116,12 +156,20 @@ async function fetchOpenMeteo(lat: number, lon: number): Promise<Weather> {
     code: d.daily.weather_code[i] as number,
   }));
 
+  // Pioggia nelle prossime 6 ore, dalle stesse ore mostrate nell'app
+  const nowMin = Number(String(d.current.time).slice(14, 16)) || 0;
+  const rainHours = hourly.slice(0, 6).map((h, i) => ({ startMin: Math.max(0, i * 60 - nowMin), code: h.code }));
+
   return {
+    uv: typeof d.current.uv_index === "number" ? d.current.uv_index : undefined,
+    uvMax: typeof d.daily.uv_index_max?.[0] === "number" ? d.daily.uv_index_max[0] : undefined,
+    rainSoon: summarizeRain(rainHours),
     current: {
       temperature: d.current.temperature_2m,
       feelsLike: d.current.apparent_temperature,
       humidity: d.current.relative_humidity_2m,
       windSpeed: d.current.wind_speed_10m,
+      windDir: typeof d.current.wind_direction_10m === "number" ? d.current.wind_direction_10m : undefined,
       code: d.current.weather_code,
       isDay: d.current.is_day === 1,
     },
@@ -216,6 +264,12 @@ async function fetchMetNo(lat: number, lon: number, contact: string): Promise<We
     });
   const hourly = hourlyAll.filter((h) => h.time.getTime() > now - 60 * 60 * 1000).slice(0, 24);
 
+  // Pioggia nelle prossime 6 ore, dalle stesse ore mostrate nell'app
+  const rainHours = hourly.slice(0, 6).map((h) => ({
+    startMin: Math.max(0, (h.time.getTime() - now) / 60000),
+    code: h.code,
+  }));
+
   // Raggruppo per giorno (fuso del telefono) e ricavo min/max e pioggia
   const groups = new Map<string, typeof entries>();
   for (const e of entries) {
@@ -259,11 +313,13 @@ async function fetchMetNo(lat: number, lon: number, contact: string): Promise<We
       temperature: first.t.air_temperature,
       humidity: first.t.relative_humidity ?? 0,
       windSpeed: (first.t.wind_speed ?? 0) * 3.6, // m/s -> km/h
+      windDir: typeof first.t.wind_from_direction === "number" ? first.t.wind_from_direction : undefined,
       code: nowSym.code,
       isDay: nowSym.isDay,
     },
     hourly,
     hourlyAll,
     daily,
+    rainSoon: summarizeRain(rainHours),
   };
 }

@@ -24,17 +24,24 @@ function revive(raw: any): Weather {
     daily: (raw.daily ?? []).map((x: any) => ({ ...x, date: new Date(x.date) })),
     sunrise: d(raw.sunrise),
     sunset: d(raw.sunset),
+    uv: raw.uv,
+    uvMax: raw.uvMax,
+    airQuality: raw.airQuality,
+    rainSoon: raw.rainSoon,
   };
 }
 
 // Se i dati sono vecchi, tolgo le ore e i giorni già passati.
-export function trimStale(w: Weather, now = Date.now()): Weather {
+export function trimStale(w: Weather, now = Date.now(), savedAt = now): Weather {
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
   const hourly = w.hourly.filter((h) => h.time.getTime() > now - 60 * 60 * 1000);
   const daily = w.daily.filter((x) => x.date.getTime() >= startOfToday.getTime());
+  // La pioggia imminente vale pochi minuti: se i dati sono vecchi non la mostro
+  const rainSoon = now - savedAt <= 30 * 60 * 1000 ? w.rainSoon : undefined;
   return {
     ...w,
+    rainSoon,
     hourly: hourly.length ? hourly : w.hourly,
     daily: daily.length ? daily : w.daily,
   };

@@ -80,7 +80,7 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
     const cached = await getCached(s.provider, p.latitude, p.longitude);
     if (mySeq !== seq.current) return;
     if (cached) {
-      setWeather(trimStale(cached.weather));
+      setWeather(trimStale(cached.weather, Date.now(), cached.savedAt));
       setUpdatedAt(cached.savedAt);
     } else {
       setWeather(null);

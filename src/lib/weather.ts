@@ -29,6 +29,8 @@ export type Weather = {
     feelsLike?: number;
     humidity: number;
     windSpeed: number;
+    /** Gradi da cui soffia il vento (0 = nord). */
+    windDir?: number;
     code: number;
     isDay: boolean;
   };
@@ -46,7 +48,89 @@ export type Weather = {
   }[];
   sunrise?: Date;
   sunset?: Date;
+  /** Indice UV adesso e massimo di oggi (non disponibile con tutte le fonti). */
+  uv?: number;
+  uvMax?: number;
+  airQuality?: AirQuality;
+  rainSoon?: RainSoon;
 };
+
+/** Qualità dell'aria: indice europeo (EAQI) e polveri PM2.5. */
+export type AirQuality = { aqi: number; pm25?: number };
+
+/** Pioggia o neve imminente, calcolata sulle stesse ore mostrate in "Prossime 24 ore". */
+export type RainSoon = {
+  state: "now" | "soon" | "none";
+  /** true se la precipitazione è neve. */
+  snow?: boolean;
+  /** Minuti all'inizio della precipitazione (state "soon"). */
+  inMin?: number;
+  /** Minuti alla fine (state "now"); assente se continua oltre l'orizzonte. */
+  endsInMin?: number;
+  /** Quanto in avanti guardano i dati, in minuti. */
+  horizonMin: number;
+};
+
+// Codici WMO con precipitazione: pioggerella, pioggia, neve, rovesci, temporali
+export const isPrecipCode = (code: number) =>
+  (code >= 51 && code <= 67) || (code >= 71 && code <= 77) || (code >= 80 && code <= 86) || code >= 95;
+const isSnowCode = (code: number) => (code >= 71 && code <= 77) || code === 85 || code === 86;
+
+// Una voce per ora; startMin è relativo ad adesso (la prima ora contiene "adesso").
+// Usa i codici meteo orari, gli stessi delle icone mostrate, così alert e ore non si contraddicono.
+export function summarizeRain(hours: { startMin: number; code: number }[]): RainSoon | undefined {
+  if (hours.length === 0) return undefined;
+  const horizonMin = Math.round(hours[hours.length - 1].startMin + 60);
+  const wet = (h: { code: number }) => isPrecipCode(h.code);
+  if (wet(hours[0])) {
+    const dry = hours.find((h) => !wet(h));
+    return {
+      state: "now",
+      snow: isSnowCode(hours[0].code),
+      endsInMin: dry ? Math.max(0, Math.round(dry.startMin)) : undefined,
+      horizonMin,
+    };
+  }
+  const next = hours.find(wet);
+  if (next) return { state: "soon", snow: isSnowCode(next.code), inMin: Math.max(0, Math.round(next.startMin)), horizonMin };
+  return { state: "none", horizonMin };
+}
+
+const fmtMin = (m: number) => {
+  if (m < 60) return `${Math.max(5, Math.round(m / 5) * 5)} min`;
+  const h = Math.round((m / 60) * 2) / 2;
+  return h === 1 ? "1 ora" : `${String(h).replace(".", ",")} ore`;
+};
+
+export function rainSoonText(r: RainSoon): string {
+  const noun = r.snow ? "Neve" : "Pioggia";
+  if (r.state === "now") {
+    const verb = r.snow ? "Nevica ora" : "Piove ora";
+    return r.endsInMin != null
+      ? `${verb} · smette tra circa ${fmtMin(r.endsInMin)}`
+      : `${verb} · continua nelle prossime ${fmtMin(r.horizonMin)}`;
+  }
+  if (r.state === "soon") return `${noun} in arrivo tra circa ${fmtMin(r.inMin ?? 0)}`;
+  return `Nessuna precipitazione nelle prossime ${fmtMin(r.horizonMin)}`;
+}
+
+export function uvLabel(uv: number): string {
+  if (uv < 3) return "Basso";
+  if (uv < 6) return "Moderato";
+  if (uv < 8) return "Alto";
+  if (uv < 11) return "Molto alto";
+  return "Estremo";
+}
+
+// Indice europeo della qualità dell'aria (EAQI)
+export function aqiLabel(aqi: number): string {
+  if (aqi <= 20) return "Buona";
+  if (aqi <= 40) return "Discreta";
+  if (aqi <= 60) return "Moderata";
+  if (aqi <= 80) return "Scadente";
+  if (aqi <= 100) return "Molto scadente";
+  return "Pessima";
+}
 
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
