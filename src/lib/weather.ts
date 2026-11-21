@@ -134,6 +134,8 @@ export function aqiLabel(aqi: number): string {
 
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
+// Nominatim richiede che l'app si identifichi (https://operations.osmfoundation.org/policies/nominatim/)
+const NOMINATIM_USER_AGENT = "MeteoPersonale/1.0 (+https://github.com/gdaloiso/MobileMeteo)";
 
 export async function getJson<T>(url: string, headers?: Record<string, string>): Promise<T> {
   const res = await fetch(url, headers ? { headers } : undefined);
@@ -176,7 +178,9 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string |
   }
   try {
     const url = `${REVERSE_URL}?lat=${lat}&lon=${lon}&format=jsonv2&zoom=10&accept-language=it`;
-    const data = await getJson<{ address?: Record<string, string> }>(url);
+    const data = await getJson<{ address?: Record<string, string> }>(url, {
+      "User-Agent": NOMINATIM_USER_AGENT,
+    });
     const a = data.address ?? {};
     return a.city ?? a.town ?? a.village ?? a.municipality ?? a.county;
   } catch {

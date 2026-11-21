@@ -21,6 +21,20 @@ Non richiede chiavi API: i dati arrivano da servizi gratuiti.
   - fonte dei dati: Open-Meteo o MET Norway
 - **Dati salvati:** l'app mostra subito gli ultimi dati scaricati e li aggiorna in rete (cache di 10 minuti).
 
+## Download
+
+Scarica l'ultima versione per **Android** dalla pagina [Releases](https://github.com/gdaloiso/MobileMeteo/releases/latest): nella sezione *Assets* trovi il file `.apk`.
+
+Per installarlo:
+
+1. Apri il file `.apk` dal telefono.
+2. Se Android lo chiede, consenti l'installazione da questa fonte (*Installa app sconosciute*).
+3. Se Google Play Protect segnala l'app come non verificata, scegli *Installa comunque*: l'app non è pubblicata sul Play Store.
+
+Gli aggiornamenti non sono automatici: per passare a una nuova versione scarica il nuovo `.apk` e installalo sopra quello esistente. I dati e le impostazioni restano.
+
+Per iPhone non c'è un pacchetto scaricabile: si può provare con Expo Go (vedi sotto).
+
 ## Fonti dei dati
 
 | Servizio | Uso | Note |
