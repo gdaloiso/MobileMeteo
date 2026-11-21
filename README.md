@@ -5,8 +5,12 @@ Non richiede chiavi API: i dati arrivano da servizi gratuiti.
 
 ## Funzioni
 
-- **Oggi:** temperatura, temperatura percepita, umidità, vento, pioggia, alba e tramonto.
-- **Prossime 24 ore:** riga orizzontale con ora, icona, temperatura e probabilità di pioggia.
+- **Oggi:** temperatura, temperatura percepita, umidità, vento (con direzione), pioggia, alba, tramonto e durata del giorno.
+- **Indice UV:** valore attuale con livello (Basso, Moderato, Alto, Molto alto, Estremo).
+- **Qualità dell'aria:** indice europeo (EAQI) con giudizio da Buona a Pessima. Se il dato non è disponibile, il resto dell'app funziona comunque.
+- **Fase lunare:** fase e percentuale di luna illuminata, calcolate sul telefono senza servizi esterni.
+- **Avviso pioggia/neve:** indica se sta piovendo o nevicando e quando smette, oppure tra quanto inizia, in base alle ore delle prossime 24.
+- **Prossime 24 ore:** grafico a curva della temperatura con, per ogni ora, icona, temperatura e probabilità di pioggia. Scorre in orizzontale.
 - **Prossimi 7 giorni:** toccando un giorno si apre il dettaglio ora per ora.
 - **Città:** ricerca per nome, preferiti (con la stella) e "La mia posizione" via GPS.
 - **Impostazioni:**
@@ -21,8 +25,9 @@ Non richiede chiavi API: i dati arrivano da servizi gratuiti.
 
 | Servizio | Uso | Note |
 | --- | --- | --- |
-| [Open-Meteo](https://open-meteo.com) | Previsioni (predefinito) e ricerca città | Include alba, tramonto e temperatura percepita |
+| [Open-Meteo](https://open-meteo.com) | Previsioni (predefinito) e ricerca città | Include alba, tramonto, temperatura percepita e indice UV |
 | [MET Norway](https://api.met.no) | Previsioni alternative | Richiede un contatto (email o sito) nelle impostazioni, che resta sul telefono e viene inviato solo a MET Norway |
+| [Open-Meteo Air Quality](https://open-meteo.com/en/docs/air-quality-api) | Qualità dell'aria (EAQI, PM2.5) | Usata con entrambe le fonti meteo |
 | Servizio di geocodifica del telefono, poi [Nominatim](https://nominatim.openstreetmap.org) | Nome della città dalla posizione GPS | |
 
 ## Struttura del progetto
@@ -30,9 +35,9 @@ Non richiede chiavi API: i dati arrivano da servizi gratuiti.
 ```
 src/
   app/             Schermate (Expo Router): (today), (cities), (settings)
-  components/      Componenti riusabili (card, liste, selettori)
+  components/      Componenti riusabili (card, griglia statistiche, grafico orario, liste, selettori)
   providers/       Stato globale: luogo, meteo, preferiti, impostazioni
-  lib/             Servizi meteo, cache, storage, unità di misura
+  lib/             Servizi meteo, cache, storage, unità di misura, fase lunare, grafici
   theme/           Palette colori chiaro/scuro
 assets/            Icone e splash
 ```
@@ -127,8 +132,8 @@ Su Windows usa PowerShell, Prompt dei comandi o Git Bash.
 
 ## Identificativi dell'app
 
-- Android: `it.giuseppe.meteo`
-- iOS: `it.giuseppe.meteo`
+- Android: `it.gdalo.meteo`
+- iOS: `it.gdalo.meteo`
 
 ## Note
 
